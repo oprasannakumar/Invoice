@@ -34,14 +34,25 @@ input {
   box-sizing: border-box;
 }
 
+/* ✅ Item layout */
 .item-row {
-  display: grid;
-  grid-template-columns: 2fr 1fr 1.5fr 1.5fr 38px;
-  gap: 5px;
-  margin-top: 6px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  padding: 8px;
+  margin-top: 8px;
 }
 
-.item-row button {
+.item-name {
+  margin-bottom: 6px;
+}
+
+.item-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr 38px;
+  gap: 5px;
+}
+
+.item-grid button {
   background: #dc3545;
   color: #fff;
   border: none;
@@ -68,7 +79,7 @@ input {
   color: #007bff;
 }
 
-/* ✅ Invoice popup */
+/* Invoice popup (unchanged) */
 .popup {
   position: fixed;
   inset: 0;
@@ -84,9 +95,6 @@ input {
   width: 90%;
   max-width: 360px;
   text-align: center;
-}
-.popup-box h3 {
-  margin-top: 0;
 }
 .popup-actions {
   display: flex;
@@ -126,7 +134,6 @@ input {
   <div id="status"></div>
 </form>
 
-<!-- ✅ Invoice Popup -->
 <div class="popup" id="invoicePopup">
   <div class="popup-box">
     <h3>Invoice Generated</h3>
@@ -141,20 +148,17 @@ input {
 <script>
 const scriptURL = "https://script.google.com/macros/s/AKfycbyyddjxBSeVhHK0AXc_vvBEFu4Y3mb24fd4TDVkWgWwnZ5wdCstfoQeOCvbRZcT4kN3/exec";
 
-/* yyyy-mm-dd → d/m/yyyy */
 function formatDate(value) {
   const [y, m, d] = value.split("-");
   return `${parseInt(d)}/${parseInt(m)}/${y}`;
 }
 
-/* Generate bill number */
 function generateBillNo() {
   const now = new Date();
   const pad = n => String(n).padStart(2, "0");
   return `INV-${now.getFullYear()}${pad(now.getMonth()+1)}${pad(now.getDate())}-${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
 }
 
-/* Parse decimal, fraction, mixed fraction */
 function parseNumber(value) {
   if (!value) return 0;
   value = value.trim();
@@ -191,22 +195,28 @@ function calculate(row) {
   }
 }
 
+/* ✅ UPDATED ITEM STRUCTURE */
 function addItem() {
   const div = document.createElement("div");
   div.className = "item-row";
   div.innerHTML = `
-    <input placeholder="Item" required>
-    <input class="qty" placeholder="Qty (1/2, 2 1/2)" oninput="calculate(this.parentElement)" required>
-    <input class="total" placeholder="Total ₹" oninput="calculate(this.parentElement)">
-    <input class="unit" placeholder="Unit ₹" oninput="calculate(this.parentElement)">
-    <button type="button" onclick="removeItem(this)">✕</button>
+    <div class="item-name">
+      <input placeholder="Item" required>
+    </div>
+
+    <div class="item-grid">
+      <input class="qty" placeholder="Qty (1/2, 2 1/2)" oninput="calculate(this.closest('.item-row'))" required>
+      <input class="unit" placeholder="Unit ₹" oninput="calculate(this.closest('.item-row'))">
+      <input class="total" placeholder="Total ₹" oninput="calculate(this.closest('.item-row'))">
+      <button type="button" onclick="removeItem(this)">✕</button>
+    </div>
   `;
   document.getElementById("items").appendChild(div);
 }
 
 function removeItem(btn) {
   const items = document.getElementById("items");
-  if (items.children.length > 1) btn.parentElement.remove();
+  if (items.children.length > 1) btn.closest(".item-row").remove();
   else alert("At least one item is required");
 }
 
@@ -232,7 +242,7 @@ document.getElementById("billForm").addEventListener("submit", e => {
     items.push({
       name: inputs[0].value,
       qty: parseNumber(inputs[1].value),
-      price: parseNumber(inputs[3].value)
+      price: parseNumber(inputs[2].value)
     });
   });
 
