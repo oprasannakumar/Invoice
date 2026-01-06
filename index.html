@@ -67,6 +67,41 @@ input {
   font-weight: bold;
   color: #007bff;
 }
+
+/* ✅ Invoice popup */
+.popup {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.4);
+  display: none;
+  align-items: center;
+  justify-content: center;
+}
+.popup-box {
+  background: #fff;
+  padding: 20px;
+  border-radius: 8px;
+  width: 90%;
+  max-width: 360px;
+  text-align: center;
+}
+.popup-box h3 {
+  margin-top: 0;
+}
+.popup-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 15px;
+}
+.popup-actions button {
+  flex: 1;
+  height: 40px;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.copy-btn { background: #007bff; color: #fff; }
+.close-btn { background: #6c757d; color: #fff; }
 </style>
 </head>
 
@@ -91,6 +126,18 @@ input {
   <div id="status"></div>
 </form>
 
+<!-- ✅ Invoice Popup -->
+<div class="popup" id="invoicePopup">
+  <div class="popup-box">
+    <h3>Invoice Generated</h3>
+    <p id="invoiceText"></p>
+    <div class="popup-actions">
+      <button class="copy-btn" onclick="copyInvoice()">Copy</button>
+      <button class="close-btn" onclick="invoicePopup.style.display='none'">Close</button>
+    </div>
+  </div>
+</div>
+
 <script>
 const scriptURL = "https://script.google.com/macros/s/AKfycbyyddjxBSeVhHK0AXc_vvBEFu4Y3mb24fd4TDVkWgWwnZ5wdCstfoQeOCvbRZcT4kN3/exec";
 
@@ -98,6 +145,13 @@ const scriptURL = "https://script.google.com/macros/s/AKfycbyyddjxBSeVhHK0AXc_vv
 function formatDate(value) {
   const [y, m, d] = value.split("-");
   return `${parseInt(d)}/${parseInt(m)}/${y}`;
+}
+
+/* Generate bill number */
+function generateBillNo() {
+  const now = new Date();
+  const pad = n => String(n).padStart(2, "0");
+  return `INV-${now.getFullYear()}${pad(now.getMonth()+1)}${pad(now.getDate())}-${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
 }
 
 /* Parse decimal, fraction, mixed fraction */
@@ -119,7 +173,6 @@ function parseNumber(value) {
   return parseFloat(value) || 0;
 }
 
-/* Auto calculations */
 function calculate(row) {
   const qtyInput   = row.querySelector(".qty");
   const totalInput = row.querySelector(".total");
@@ -138,45 +191,27 @@ function calculate(row) {
   }
 }
 
-/* Add item row */
 function addItem() {
   const div = document.createElement("div");
   div.className = "item-row";
   div.innerHTML = `
     <input placeholder="Item" required>
-
-    <input class="qty"
-      placeholder="Qty (1/2, 2 1/2)"
-      oninput="calculate(this.parentElement)"
-      required>
-
-    <input class="total"
-      placeholder="Total ₹"
-      oninput="calculate(this.parentElement)">
-
-    <input class="unit"
-      placeholder="Unit ₹"
-      oninput="calculate(this.parentElement)">
-
+    <input class="qty" placeholder="Qty (1/2, 2 1/2)" oninput="calculate(this.parentElement)" required>
+    <input class="total" placeholder="Total ₹" oninput="calculate(this.parentElement)">
+    <input class="unit" placeholder="Unit ₹" oninput="calculate(this.parentElement)">
     <button type="button" onclick="removeItem(this)">✕</button>
   `;
   document.getElementById("items").appendChild(div);
 }
 
-/* Remove item row */
 function removeItem(btn) {
   const items = document.getElementById("items");
-  if (items.children.length > 1) {
-    btn.parentElement.remove();
-  } else {
-    alert("At least one item is required");
-  }
+  if (items.children.length > 1) btn.parentElement.remove();
+  else alert("At least one item is required");
 }
 
-/* Initial row */
 addItem();
 
-/* FAST submit (fire & forget) */
 document.getElementById("billForm").addEventListener("submit", e => {
   e.preventDefault();
 
@@ -186,37 +221,43 @@ document.getElementById("billForm").addEventListener("submit", e => {
   status.innerText = "Saving bill...";
   saveBtn.disabled = true;
 
+  if (!billNo.value.trim()) billNo.value = generateBillNo();
+
+  invoiceText.innerText = billNo.value;
+  invoicePopup.style.display = "flex";
+
   const items = [];
   document.querySelectorAll(".item-row").forEach(row => {
     const inputs = row.querySelectorAll("input");
     items.push({
       name: inputs[0].value,
       qty: parseNumber(inputs[1].value),
-      price: parseNumber(inputs[3].value) // unit price
+      price: parseNumber(inputs[3].value)
     });
   });
 
-  const payload = {
-    billDate: formatDate(billDate.value),
-    shopName: shopName.value,
-    billNo: billNo.value,
-    items
-  };
-
-  /* Fire and forget */
   fetch(scriptURL, {
     method: "POST",
     mode: "no-cors",
-    body: JSON.stringify(payload)
+    body: JSON.stringify({
+      billDate: formatDate(billDate.value),
+      shopName: shopName.value,
+      billNo: billNo.value,
+      items
+    })
   });
 
-  /* Instant UX */
   status.innerText = "Saved successfully ✅";
   saveBtn.disabled = false;
   billForm.reset();
   document.getElementById("items").innerHTML = "";
   addItem();
 });
+
+function copyInvoice() {
+  navigator.clipboard.writeText(invoiceText.innerText);
+  invoiceText.innerText += " ✔ Copied";
+}
 </script>
 
 </body>
