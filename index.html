@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Bill Backup</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<style>
+body {
+  font-family: Arial, sans-serif;
+  background: #f5f5f5;
+  padding: 20px;
+}
+
+form {
+  background: #ffffff;
+  max-width: 500px;
+  margin: auto;
+  padding: 20px;
+  border-radius: 8px;
+  box-shadow: 0 0 10px rgba(0,0,0,0.1);
+}
+
+label {
+  font-weight: bold;
+  margin-top: 10px;
+  display: block;
+}
+
+input {
+  width: 100%;
+  height: 40px;
+  padding: 8px;
+  margin-top: 5px;
+  box-sizing: border-box;
+}
+
+.item-row {
+  display: flex;
+  gap: 5px;
+  margin-top: 6px;
+}
+
+.item-row input {
+  flex: 1;
+}
+
+.item-row button {
+  width: 38px;
+  background: #dc3545;
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.add-btn, .save-btn {
+  width: 100%;
+  height: 42px;
+  margin-top: 12px;
+  border: none;
+  border-radius: 4px;
+  font-size: 15px;
+  cursor: pointer;
+}
+
+.add-btn {
+  background: #007bff;
+  color: #fff;
+}
+
+.save-btn {
+  background: #28a745;
+  color: #fff;
+}
+</style>
+</head>
+
+<body>
+
+<form id="billForm">
+  <label>Bill Date</label>
+  <input type="date" id="billDate" required>
+
+  <label>Shop Name</label>
+  <input type="text" id="shopName" required>
+
+  <label>Bill Number</label>
+  <input type="text" id="billNo">
+
+  <label>Items</label>
+  <div id="items"></div>
+
+  <button type="button" class="add-btn" onclick="addItem()">+ Add Item</button>
+  <button type="submit" class="save-btn">Save Bill</button>
+</form>
+
+<script>
+const scriptURL = "https://script.google.com/macros/s/AKfycbyyddjxBSeVhHK0AXc_vvBEFu4Y3mb24fd4TDVkWgWwnZ5wdCstfoQeOCvbRZcT4kN3/exec";
+
+// Convert yyyy-mm-dd ? d/m/yyyy
+function formatDate(dateValue) {
+  const [year, month, day] = dateValue.split("-");
+  return `${parseInt(day)}/${parseInt(month)}/${year}`;
+}
+
+function addItem() {
+  const div = document.createElement("div");
+  div.className = "item-row";
+  div.innerHTML = `
+    <input placeholder="Item" required>
+    <input type="number" placeholder="Qty" required>
+    <input type="number" placeholder="Price" required>
+    <button type="button" onclick="removeItem(this)">?</button>
+  `;
+  document.getElementById("items").appendChild(div);
+}
+
+function removeItem(btn) {
+  const items = document.getElementById("items");
+  if (items.children.length > 1) {
+    btn.parentElement.remove();
+  } else {
+    alert("At least one item is required");
+  }
+}
+
+// Initial row
+addItem();
+
+document.getElementById("billForm").addEventListener("submit", e => {
+  e.preventDefault();
+
+  const items = [];
+  document.querySelectorAll(".item-row").forEach(row => {
+    const inputs = row.querySelectorAll("input");
+    items.push({
+      name: inputs[0].value,
+      qty: Number(inputs[1].value),
+      price: Number(inputs[2].value)
+    });
+  });
+
+  const payload = {
+    billDate: formatDate(billDate.value),
+    shopName: shopName.value,
+    billNo: billNo.value,
+    items
+  };
+
+  fetch(scriptURL, {
+    method: "POST",
+    mode: "no-cors",
+    body: JSON.stringify(payload)
+  })
+  .then(() => {
+    alert("Bill saved successfully ?");
+    billForm.reset();
+    document.getElementById("items").innerHTML = "";
+    addItem();
+  })
+  .catch(() => alert("Error saving bill ?"));
+});
+</script>
+
+</body>
+</html>
