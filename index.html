@@ -14,7 +14,7 @@ body {
 
 form {
   background: #ffffff;
-  max-width: 500px;
+  max-width: 600px;
   margin: auto;
   padding: 20px;
   border-radius: 8px;
@@ -29,24 +29,19 @@ label {
 
 input {
   width: 100%;
-  height: 40px;
-  padding: 8px;
-  margin-top: 5px;
+  height: 38px;
+  padding: 6px;
   box-sizing: border-box;
 }
 
 .item-row {
-  display: flex;
+  display: grid;
+  grid-template-columns: 2fr 1fr 1.5fr 1.5fr 38px;
   gap: 5px;
   margin-top: 6px;
 }
 
-.item-row input {
-  flex: 1;
-}
-
 .item-row button {
-  width: 38px;
   background: #dc3545;
   color: #fff;
   border: none;
@@ -64,14 +59,13 @@ input {
   cursor: pointer;
 }
 
-.add-btn {
-  background: #007bff;
-  color: #fff;
-}
+.add-btn { background: #007bff; color: #fff; }
+.save-btn { background: #28a745; color: #fff; }
 
-.save-btn {
-  background: #28a745;
-  color: #fff;
+#status {
+  margin-top: 10px;
+  font-weight: bold;
+  color: #007bff;
 }
 </style>
 </head>
@@ -93,29 +87,83 @@ input {
 
   <button type="button" class="add-btn" onclick="addItem()">+ Add Item</button>
   <button type="submit" class="save-btn">Save Bill</button>
+
+  <div id="status"></div>
 </form>
 
 <script>
 const scriptURL = "https://script.google.com/macros/s/AKfycbyyddjxBSeVhHK0AXc_vvBEFu4Y3mb24fd4TDVkWgWwnZ5wdCstfoQeOCvbRZcT4kN3/exec";
 
-// Convert yyyy-mm-dd ? d/m/yyyy
-function formatDate(dateValue) {
-  const [year, month, day] = dateValue.split("-");
-  return `${parseInt(day)}/${parseInt(month)}/${year}`;
+/* yyyy-mm-dd → d/m/yyyy */
+function formatDate(value) {
+  const [y, m, d] = value.split("-");
+  return `${parseInt(d)}/${parseInt(m)}/${y}`;
 }
 
+/* Parse decimal, fraction, mixed fraction */
+function parseNumber(value) {
+  if (!value) return 0;
+  value = value.trim();
+
+  if (value.includes(" ")) {
+    const [whole, frac] = value.split(" ");
+    return parseFloat(whole) + parseNumber(frac);
+  }
+
+  if (value.includes("/")) {
+    const [num, den] = value.split("/");
+    if (!den || den == 0) return 0;
+    return parseFloat(num) / parseFloat(den);
+  }
+
+  return parseFloat(value) || 0;
+}
+
+/* Auto calculations */
+function calculate(row) {
+  const qtyInput   = row.querySelector(".qty");
+  const totalInput = row.querySelector(".total");
+  const unitInput  = row.querySelector(".unit");
+
+  const qty   = parseNumber(qtyInput.value);
+  const total = parseNumber(totalInput.value);
+  const unit  = parseNumber(unitInput.value);
+
+  if (qty > 0 && total > 0 && document.activeElement === totalInput) {
+    unitInput.value = (total / qty).toFixed(2);
+  }
+
+  if (qty > 0 && unit > 0 && document.activeElement === unitInput) {
+    totalInput.value = (qty * unit).toFixed(2);
+  }
+}
+
+/* Add item row */
 function addItem() {
   const div = document.createElement("div");
   div.className = "item-row";
   div.innerHTML = `
     <input placeholder="Item" required>
-    <input type="number" placeholder="Qty" required>
-    <input type="number" placeholder="Price" required>
-    <button type="button" onclick="removeItem(this)">?</button>
+
+    <input class="qty"
+      placeholder="Qty (1/2, 2 1/2)"
+      oninput="calculate(this.parentElement)"
+      required>
+
+    <input class="total"
+      placeholder="Total ₹"
+      oninput="calculate(this.parentElement)">
+
+    <input class="unit"
+      placeholder="Unit ₹"
+      oninput="calculate(this.parentElement)">
+
+    <button type="button" onclick="removeItem(this)">✕</button>
   `;
   document.getElementById("items").appendChild(div);
 }
 
+/* Remove item row */
 function removeItem(btn) {
   const items = document.getElementById("items");
   if (items.children.length > 1) {
@@ -125,19 +173,26 @@ function removeItem(btn) {
   }
 }
 
-// Initial row
+/* Initial row */
 addItem();
 
+/* FAST submit (fire & forget) */
 document.getElementById("billForm").addEventListener("submit", e => {
   e.preventDefault();
+
+  const status = document.getElementById("status");
+  const saveBtn = document.querySelector(".save-btn");
+
+  status.innerText = "Saving bill...";
+  saveBtn.disabled = true;
 
   const items = [];
   document.querySelectorAll(".item-row").forEach(row => {
     const inputs = row.querySelectorAll("input");
     items.push({
       name: inputs[0].value,
-      qty: Number(inputs[1].value),
-      price: Number(inputs[2].value)
+      qty: parseNumber(inputs[1].value),
+      price: parseNumber(inputs[3].value) // unit price
     });
   });
 
@@ -148,18 +203,19 @@ document.getElementById("billForm").addEventListener("submit", e => {
     items
   };
 
+  /* Fire and forget */
   fetch(scriptURL, {
     method: "POST",
     mode: "no-cors",
     body: JSON.stringify(payload)
-  })
-  .then(() => {
-    alert("Bill saved successfully ?");
-    billForm.reset();
-    document.getElementById("items").innerHTML = "";
-    addItem();
-  })
-  .catch(() => alert("Error saving bill ?"));
+  });
+
+  /* Instant UX */
+  status.innerText = "Saved successfully ✅";
+  saveBtn.disabled = false;
+  billForm.reset();
+  document.getElementById("items").innerHTML = "";
+  addItem();
 });
 </script>
 
