@@ -122,11 +122,18 @@ button { border: none; cursor: pointer; }
 <script>
 const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyaqhCzL-9c0ZatEt9VFMGh1EwuFtYIRKvd4xyKKQqsCVnGoas0ZjHgWKzGYAVjOg-Dwg/exec";
 
-/* yyyy-mm-dd → dd/mm/yyyy */
+/* yyyy-mm-dd → d/Mon/yyyy */
 function formatDate(d) {
   const [y, m, day] = d.split("-");
-  return `${Number(day)}/${Number(m)}/${y}`;
+
+  const months = [
+    "Jan","Feb","Mar","Apr","May","Jun",
+    "Jul","Aug","Sep","Oct","Nov","Dec"
+  ];
+
+  return `${Number(day)}/${months[Number(m) - 1]}/${y}`;
 }
+
 
 
 /* Set today's date */
@@ -187,7 +194,6 @@ function copyInvoiceHTML() {
   alert("Invoice copied ✅");
 }
 
-/* Submit */
 function submitBill(e) {
   e.preventDefault();
 
@@ -197,7 +203,45 @@ function submitBill(e) {
     showInvoicePopup(inv);
   }
 
-  const itemsData = [...document.querySelectorAll(".item-row")].map(r => ({
+  const itemRows = [...document.querySelectorAll(".item-row")];
+  if (itemRows.length === 0) {
+    alert("Please add at least one item");
+    return;
+  }
+
+  let summary = "";
+  let grandTotal = 0;
+
+  itemRows.forEach((r, i) => {
+    const name = r.querySelector(".name").value;
+    const qty = r.querySelector(".qty").value;
+    const price = r.querySelector(".price").value;
+    const total = r.querySelector(".total").value;
+
+    grandTotal += Number(total || 0);
+
+    summary +=
+      `${i + 1}) ${name}\n` +
+      `   Qty   : ${qty}\n` +
+      `   Price : ₹${price}\n` +
+      `   Total : ₹${total}\n\n`;
+  });
+
+  // ✅ FULL CONFIRMATION MESSAGE
+  const ok = confirm(
+    `You are about to save the following bill:\n\n` +
+    `Date    : ${formatDate(date.value)}\n` +
+    `Shop    : ${shop.value}\n` +
+    `Invoice : ${inv}\n\n` +
+    `Items:\n${summary}` +
+    `------------------------\n` +
+    `Grand Total : ₹${grandTotal.toFixed(2)}\n\n` +
+    `Do you want to continue?`
+  );
+
+  if (!ok) return; // ❌ User cancelled
+
+  const itemsData = itemRows.map(r => ({
     name: r.querySelector(".name").value,
     qty: r.querySelector(".qty").value,
     price: r.querySelector(".price").value,
@@ -220,6 +264,7 @@ function submitBill(e) {
     addItem();
   });
 }
+
 
 addItem();
 </script>
