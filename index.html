@@ -7,549 +7,222 @@
 
 <style>
 body {
-  font-family: Arial, sans-serif;
+  font-family: Arial;
   background: #f5f5f5;
   padding: 20px;
 }
-
 form {
-  background: #ffffff;
   max-width: 600px;
+  background: #fff;
   margin: auto;
   padding: 20px;
   border-radius: 8px;
-  box-shadow: 0 0 10px rgba(0,0,0,0.1);
+  box-shadow: 0 0 10px rgba(0,0,0,.1);
 }
-
 label {
   font-weight: bold;
-  margin-top: 10px;
   display: block;
+  margin-top: 10px;
 }
-
-input {
+input, button {
   width: 100%;
-  height: 38px;
+  height: 40px;
+  margin-top: 5px;
   padding: 6px;
   box-sizing: border-box;
 }
 
-/* ✅ Item layout */
 .item-row {
   border: 1px solid #ddd;
+  padding: 12px;
   border-radius: 6px;
-  padding: 8px;
-  margin-top: 8px;
-}
-
-.item-name {
-  margin-bottom: 6px;
-}
-
-.item-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr 1fr 38px;
-  gap: 5px;
-}
-
-.item-grid button {
-  background: #dc3545;
-  color: #fff;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-}
-
-.add-btn, .save-btn {
-  width: 100%;
-  height: 42px;
-  margin-top: 12px;
-  border: none;
-  border-radius: 4px;
-  font-size: 15px;
-  cursor: pointer;
-}
-
-.add-btn { background: #007bff; color: #fff; }
-.save-btn { background: #28a745; color: #fff; }
-
-#status {
   margin-top: 10px;
-  font-weight: bold;
-  color: #007bff;
 }
 
-/* Invoice popup (unchanged) */
-.popup {
-  position: fixed;
-  inset: 0;
-  background: rgba(0,0,0,0.4);
-  display: none;
-  align-items: center;
-  justify-content: center;
-}
-.popup-box {
-  background: #fff;
-  padding: 20px;
-  border-radius: 8px;
-  width: 90%;
-  max-width: 360px;
-  text-align: center;
-}
-.popup-actions {
-  display: flex;
-  gap: 10px;
-  margin-top: 15px;
-}
-.popup-actions button {
-  flex: 1;
-  height: 40px;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-}
-.copy-btn { background: #007bff; color: #fff; }
-.close-btn { background: #6c757d; color: #fff; }
+.row { display: grid; grid-template-columns: 1fr; gap: 6px; }
+.row-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+
+.add-btn { background: #28a745; color: #fff; margin-top: 10px; }
+.delete-btn { background: #dc3545; color: #fff; margin-top: 6px; }
+.submit-btn { background: #007bff; color: #fff; margin-top: 15px; }
+
+button { border: none; cursor: pointer; }
 </style>
 </head>
 
 <body>
 
-<form id="billForm">
-  <label>Bill Date</label>
-  <input type="date" id="billDate" required>
+<form onsubmit="submitBill(event)">
+  <h3>Bill Backup</h3>
+
+  <label>Date</label>
+  <input type="date" id="date" required>
 
   <label>Shop Name</label>
-  <input type="text" id="shopName" required>
+  <input type="text" id="shop" required>
 
-  <label>Bill Number</label>
-  <input type="text" id="billNo">
+  <label>Invoice No</label>
+  <input type="text" id="invoice" placeholder="Leave empty to auto-generate">
 
-  <label>Items</label>
+  <h4>Items</h4>
   <div id="items"></div>
 
-  <button type="button" class="add-btn" onclick="addItem()">+ Add Item</button>
-  <button type="submit" class="save-btn">Save Bill</button>
-
-  <div id="status"></div>
+  <button type="button" class="add-btn" onclick="addItem()">➕ Add Item</button>
+  <button type="submit" class="submit-btn">💾 Save Bill</button>
 </form>
 
-<div class="popup" id="invoicePopup">
-  <div class="popup-box">
+<!-- ✅ Invoice Popup (HIDDEN INITIALLY) -->
+<div id="invoicePopup" style="
+  display:none;
+  position:fixed;
+  inset:0;
+  background:rgba(0,0,0,0.45);
+  align-items:center;
+  justify-content:center;
+  z-index:9999;
+">
+  <div style="
+    background:#fff;
+    padding:20px;
+    border-radius:8px;
+    width:320px;
+    text-align:center;
+  ">
     <h3>Invoice Generated</h3>
-    <p id="invoiceText"></p>
-    <div class="popup-actions">
-      <button class="copy-btn" onclick="copyInvoice()">Copy</button>
-      <button class="close-btn" onclick="invoicePopup.style.display='none'">Close</button>
-    </div>
+
+    <input id="popupInvoice" readonly style="
+      width:100%;
+      height:38px;
+      margin:10px 0;
+      text-align:center;
+      font-weight:bold;
+    ">
+
+    <button onclick="copyInvoiceHTML()" style="
+      width:100%;
+      background:#28a745;
+      color:#fff;
+      border:none;
+      padding:8px;
+      cursor:pointer;
+    ">📋 Copy Invoice</button>
+
+    <button onclick="closeInvoicePopup()" style="
+      width:100%;
+      background:#6c757d;
+      color:#fff;
+      border:none;
+      padding:8px;
+      margin-top:8px;
+      cursor:pointer;
+    ">Close</button>
   </div>
 </div>
 
 <script>
-const scriptURL = "<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<title>Bill Backup</title>
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyaqhCzL-9c0ZatEt9VFMGh1EwuFtYIRKvd4xyKKQqsCVnGoas0ZjHgWKzGYAVjOg-Dwg/exec";
 
-<style>
-body {
-  font-family: Arial, sans-serif;
-  background: #f5f5f5;
-  padding: 20px;
+/* yyyy-mm-dd → dd/mm/yyyy */
+function formatDate(d) {
+  const [y, m, day] = d.split("-");
+  return `${Number(day)}/${Number(m)}/${y}`;
 }
 
-form {
-  background: #ffffff;
-  max-width: 600px;
-  margin: auto;
-  padding: 20px;
-  border-radius: 8px;
-  box-shadow: 0 0 10px rgba(0,0,0,0.1);
-}
 
-label {
-  font-weight: bold;
-  margin-top: 10px;
-  display: block;
-}
+/* Set today's date */
+window.onload = () => {
+  const t = new Date();
+  date.value = `${t.getFullYear()}-${String(t.getMonth()+1).padStart(2,'0')}-${String(t.getDate()).padStart(2,'0')}`;
+};
 
-input {
-  width: 100%;
-  height: 38px;
-  padding: 6px;
-  box-sizing: border-box;
-}
-
-/* ✅ Item layout */
-.item-row {
-  border: 1px solid #ddd;
-  border-radius: 6px;
-  padding: 8px;
-  margin-top: 8px;
-}
-
-.item-name {
-  margin-bottom: 6px;
-}
-
-.item-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr 1fr 38px;
-  gap: 5px;
-}
-
-.item-grid button {
-  background: #dc3545;
-  color: #fff;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-}
-
-.add-btn, .save-btn {
-  width: 100%;
-  height: 42px;
-  margin-top: 12px;
-  border: none;
-  border-radius: 4px;
-  font-size: 15px;
-  cursor: pointer;
-}
-
-.add-btn { background: #007bff; color: #fff; }
-.save-btn { background: #28a745; color: #fff; }
-
-#status {
-  margin-top: 10px;
-  font-weight: bold;
-  color: #007bff;
-}
-
-/* Invoice popup (unchanged) */
-.popup {
-  position: fixed;
-  inset: 0;
-  background: rgba(0,0,0,0.4);
-  display: none;
-  align-items: center;
-  justify-content: center;
-}
-.popup-box {
-  background: #fff;
-  padding: 20px;
-  border-radius: 8px;
-  width: 90%;
-  max-width: 360px;
-  text-align: center;
-}
-.popup-actions {
-  display: flex;
-  gap: 10px;
-  margin-top: 15px;
-}
-.popup-actions button {
-  flex: 1;
-  height: 40px;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-}
-.copy-btn { background: #007bff; color: #fff; }
-.close-btn { background: #6c757d; color: #fff; }
-</style>
-</head>
-
-<body>
-
-<form id="billForm">
-  <label>Bill Date</label>
-  <input type="date" id="billDate" required>
-
-  <label>Shop Name</label>
-  <input type="text" id="shopName" required>
-
-  <label>Bill Number</label>
-  <input type="text" id="billNo">
-
-  <label>Items</label>
-  <div id="items"></div>
-
-  <button type="button" class="add-btn" onclick="addItem()">+ Add Item</button>
-  <button type="submit" class="save-btn">Save Bill</button>
-
-  <div id="status"></div>
-</form>
-
-<div class="popup" id="invoicePopup">
-  <div class="popup-box">
-    <h3>Invoice Generated</h3>
-    <p id="invoiceText"></p>
-    <div class="popup-actions">
-      <button class="copy-btn" onclick="copyInvoice()">Copy</button>
-      <button class="close-btn" onclick="invoicePopup.style.display='none'">Close</button>
-    </div>
-  </div>
-</div>
-
-<script>
-const scriptURL = "https://script.google.com/macros/s/AKfycbzxiBR-SH1Nkzs8VwLydYXl2vKKkxvbz78NrEMjIwR4zP0270fjcuLlf-y4vKQs0YZokQ/exec";
-
-function formatDate(value) {
-  const [y, m, d] = value.split("-");
-  return `${parseInt(d)}/${parseInt(m)}/${y}`;
-}
-
-function generateBillNo() {
-  const now = new Date();
-  const pad = n => String(n).padStart(2, "0");
-  return `INV-${now.getFullYear()}${pad(now.getMonth()+1)}${pad(now.getDate())}-${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
-}
-
-function parseNumber(value) {
-  if (!value) return 0;
-  value = value.trim();
-
-  if (value.includes(" ")) {
-    const [whole, frac] = value.split(" ");
-    return parseFloat(whole) + parseNumber(frac);
-  }
-
-  if (value.includes("/")) {
-    const [num, den] = value.split("/");
-    if (!den || den == 0) return 0;
-    return parseFloat(num) / parseFloat(den);
-  }
-
-  return parseFloat(value) || 0;
-}
-
-function calculate(row) {
-  const qtyInput   = row.querySelector(".qty");
-  const totalInput = row.querySelector(".total");
-  const unitInput  = row.querySelector(".unit");
-
-  const qty   = parseNumber(qtyInput.value);
-  const total = parseNumber(totalInput.value);
-  const unit  = parseNumber(unitInput.value);
-
-  if (qty > 0 && total > 0 && document.activeElement === totalInput) {
-    unitInput.value = (total / qty).toFixed(2);
-  }
-
-  if (qty > 0 && unit > 0 && document.activeElement === unitInput) {
-    totalInput.value = (qty * unit).toFixed(2);
-  }
-}
-
-/* ✅ UPDATED ITEM STRUCTURE */
+/* Add item */
 function addItem() {
   const div = document.createElement("div");
   div.className = "item-row";
   div.innerHTML = `
-    <div class="item-name">
-      <input placeholder="Item" required>
+    <div class="row">
+      <input placeholder="Item Name" class="name" required>
     </div>
-
-    <div class="item-grid">
-      <input class="qty" placeholder="Qty (1/2, 2 1/2)" oninput="calculate(this.closest('.item-row'))" required>
-      <input class="unit" placeholder="Unit ₹" oninput="calculate(this.closest('.item-row'))">
-      <input class="total" placeholder="Total ₹" oninput="calculate(this.closest('.item-row'))">
-      <button type="button" onclick="removeItem(this)">✕</button>
+    <div class="row-2">
+      <input type="number" step="any" placeholder="Quantity" class="qty" oninput="calc(this)">
+      <input type="number" step="any" placeholder="Price" class="price" oninput="calc(this,'price')">
     </div>
+    <div class="row">
+      <input type="number" step="any" placeholder="Total" class="total" oninput="calc(this,'total')">
+    </div>
+    <button type="button" class="delete-btn" onclick="this.parentElement.remove()">❌ Delete Item</button>
   `;
-  document.getElementById("items").appendChild(div);
+  items.appendChild(div);
 }
 
-function removeItem(btn) {
-  const items = document.getElementById("items");
-  if (items.children.length > 1) btn.closest(".item-row").remove();
-  else alert("At least one item is required");
+/* Calculation */
+function calc(el, mode) {
+  const row = el.closest(".item-row");
+  const q = parseFloat(row.querySelector(".qty").value);
+  const p = parseFloat(row.querySelector(".price").value);
+  const t = parseFloat(row.querySelector(".total").value);
+  if (!q) return;
+  if (mode === "price" && p) row.querySelector(".total").value = (q*p).toFixed(2);
+  if (mode === "total" && t) row.querySelector(".price").value = (t/q).toFixed(2);
+}
+
+/* Invoice generation (HTML only) */
+function generateInvoiceHTML() {
+  const n = new Date();
+  return `INV-${String(n.getDate()).padStart(2,'0')}${String(n.getMonth()+1).padStart(2,'0')}${n.getFullYear()}-${String(n.getHours()).padStart(2,'0')}${String(n.getMinutes()).padStart(2,'0')}${String(n.getSeconds()).padStart(2,'0')}`;
+}
+
+/* Popup controls */
+function showInvoicePopup(inv) {
+  popupInvoice.value = inv;
+  invoice.value = inv;
+  invoicePopup.style.display = "flex";
+}
+function closeInvoicePopup() {
+  invoicePopup.style.display = "none";
+}
+function copyInvoiceHTML() {
+  popupInvoice.select();
+  document.execCommand("copy");
+  alert("Invoice copied ✅");
+}
+
+/* Submit */
+function submitBill(e) {
+  e.preventDefault();
+
+  let inv = invoice.value.trim();
+  if (!inv) {
+    inv = generateInvoiceHTML();
+    showInvoicePopup(inv);
+  }
+
+  const itemsData = [...document.querySelectorAll(".item-row")].map(r => ({
+    name: r.querySelector(".name").value,
+    qty: r.querySelector(".qty").value,
+    price: r.querySelector(".price").value,
+    total: r.querySelector(".total").value
+  }));
+
+  fetch(SCRIPT_URL, {
+    method: "POST",
+    body: JSON.stringify({
+      date: formatDate(date.value),
+      shop: shop.value,
+      invoice: inv,
+      items: itemsData
+    })
+  })
+  .then(() => {
+    alert("Bill saved successfully ✅");
+    document.querySelector("form").reset();
+    items.innerHTML = "";
+    addItem();
+  });
 }
 
 addItem();
-
-document.getElementById("billForm").addEventListener("submit", e => {
-  e.preventDefault();
-
-  const status = document.getElementById("status");
-  const saveBtn = document.querySelector(".save-btn");
-
-  status.innerText = "Saving bill...";
-  saveBtn.disabled = true;
-
-  if (!billNo.value.trim()) billNo.value = generateBillNo();
-
-  invoiceText.innerText = billNo.value;
-  invoicePopup.style.display = "flex";
-
-  const items = [];
-  document.querySelectorAll(".item-row").forEach(row => {
-    const inputs = row.querySelectorAll("input");
-    items.push({
-      name: inputs[0].value,
-      qty: parseNumber(inputs[1].value),
-      price: parseNumber(inputs[2].value)
-    });
-  });
-
-  fetch(scriptURL, {
-    method: "POST",
-    mode: "no-cors",
-    body: JSON.stringify({
-      billDate: formatDate(billDate.value),
-      shopName: shopName.value,
-      billNo: billNo.value,
-      items
-    })
-  });
-
-  status.innerText = "Saved successfully ✅";
-  saveBtn.disabled = false;
-  billForm.reset();
-  document.getElementById("items").innerHTML = "";
-  addItem();
-});
-
-function copyInvoice() {
-  navigator.clipboard.writeText(invoiceText.innerText);
-  invoiceText.innerText += " ✔ Copied";
-}
 </script>
 
 </body>
 </html>
-
-
-
-";
-
-function formatDate(value) {
-  const [y, m, d] = value.split("-");
-  return `${parseInt(d)}/${parseInt(m)}/${y}`;
-}
-
-function generateBillNo() {
-  const now = new Date();
-  const pad = n => String(n).padStart(2, "0");
-  return `INV-${now.getFullYear()}${pad(now.getMonth()+1)}${pad(now.getDate())}-${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
-}
-
-function parseNumber(value) {
-  if (!value) return 0;
-  value = value.trim();
-
-  if (value.includes(" ")) {
-    const [whole, frac] = value.split(" ");
-    return parseFloat(whole) + parseNumber(frac);
-  }
-
-  if (value.includes("/")) {
-    const [num, den] = value.split("/");
-    if (!den || den == 0) return 0;
-    return parseFloat(num) / parseFloat(den);
-  }
-
-  return parseFloat(value) || 0;
-}
-
-function calculate(row) {
-  const qtyInput   = row.querySelector(".qty");
-  const totalInput = row.querySelector(".total");
-  const unitInput  = row.querySelector(".unit");
-
-  const qty   = parseNumber(qtyInput.value);
-  const total = parseNumber(totalInput.value);
-  const unit  = parseNumber(unitInput.value);
-
-  if (qty > 0 && total > 0 && document.activeElement === totalInput) {
-    unitInput.value = (total / qty).toFixed(2);
-  }
-
-  if (qty > 0 && unit > 0 && document.activeElement === unitInput) {
-    totalInput.value = (qty * unit).toFixed(2);
-  }
-}
-
-/* ✅ UPDATED ITEM STRUCTURE */
-function addItem() {
-  const div = document.createElement("div");
-  div.className = "item-row";
-  div.innerHTML = `
-    <div class="item-name">
-      <input placeholder="Item" required>
-    </div>
-
-    <div class="item-grid">
-      <input class="qty" placeholder="Qty (1/2, 2 1/2)" oninput="calculate(this.closest('.item-row'))" required>
-      <input class="unit" placeholder="Unit ₹" oninput="calculate(this.closest('.item-row'))">
-      <input class="total" placeholder="Total ₹" oninput="calculate(this.closest('.item-row'))">
-      <button type="button" onclick="removeItem(this)">✕</button>
-    </div>
-  `;
-  document.getElementById("items").appendChild(div);
-}
-
-function removeItem(btn) {
-  const items = document.getElementById("items");
-  if (items.children.length > 1) btn.closest(".item-row").remove();
-  else alert("At least one item is required");
-}
-
-addItem();
-
-document.getElementById("billForm").addEventListener("submit", e => {
-  e.preventDefault();
-
-  const status = document.getElementById("status");
-  const saveBtn = document.querySelector(".save-btn");
-
-  status.innerText = "Saving bill...";
-  saveBtn.disabled = true;
-
-  if (!billNo.value.trim()) billNo.value = generateBillNo();
-
-  invoiceText.innerText = billNo.value;
-  invoicePopup.style.display = "flex";
-
-  const items = [];
-  document.querySelectorAll(".item-row").forEach(row => {
-    const inputs = row.querySelectorAll("input");
-    items.push({
-      name: inputs[0].value,
-      qty: parseNumber(inputs[1].value),
-      price: parseNumber(inputs[2].value)
-    });
-  });
-
-  fetch(scriptURL, {
-    method: "POST",
-    mode: "no-cors",
-    body: JSON.stringify({
-      billDate: formatDate(billDate.value),
-      shopName: shopName.value,
-      billNo: billNo.value,
-      items
-    })
-  });
-
-  status.innerText = "Saved successfully ✅";
-  saveBtn.disabled = false;
-  billForm.reset();
-  document.getElementById("items").innerHTML = "";
-  addItem();
-});
-
-function copyInvoice() {
-  navigator.clipboard.writeText(invoiceText.innerText);
-  invoiceText.innerText += " ✔ Copied";
-}
-</script>
-
-</body>
-</html>
-
-
-
-
